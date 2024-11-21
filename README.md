@@ -10,7 +10,7 @@ $ pip install imcntr
 
 ## Usage
 
-- TODO
+This package was developed to communicate with the controller of the neutron imaging experiment at TRIGA Mark II at Atominstitut of TU Wien. `imcntr` provides an API to access controller functionality via Python scripts. Communication is done via a serial port. The controller, and thus the package, can be used in general for imaging experiments with radiation. The controller provides a set of functions, such as moving the sample in and out of the beam, rotating the sample for tomographic experiments, and opening and closing the beam shutter. It provides an API to access controller functionality via Python scripts.
 
 ## Contributing
 
