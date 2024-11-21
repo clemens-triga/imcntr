@@ -11,8 +11,8 @@ class Observer():
 
         :param target: Tartget to be called from subject.
         :type port: callable
-        :param *args: Variable length argument list, passed to the target when called
-        :param **kwargs: Arbitrary keyword arguments, passed to the target when called
+        :param args: Variable length argument list, passed to the target when called
+        :param kwargs: Arbitrary keyword arguments, passed to the target when called
         """
         observer_to_subscribe = {'target' : target, 'arguments' : args, 'kwarguments' : kwargs}
         if observer_to_subscribe  not in self.observer:
@@ -28,8 +28,8 @@ class Observer():
         :type port: callable
         :param all: Specifies if all observer with same :obj:`target` are removed from list
         :type all: bool
-        :param *args: Variable length argument list, passed to the target when called
-        :param **kwargs: Arbitrary keyword arguments, passed to the target when called
+        :param args: Variable length argument list, passed to the target when called
+        :param kwargs: Arbitrary keyword arguments, passed to the target when called
         """
         if target:
             if not all:

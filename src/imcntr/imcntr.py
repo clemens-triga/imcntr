@@ -38,7 +38,7 @@ class Command():
     :type command: str
     :param answer: Ansewer from controller corresponding to command
     :type answer: str
-    :param watchdog:  Instance of :cls:`ThreadPoolExecutor` with atleast one worker,
+    :param watchdog:  Instance of :class:`ThreadPoolExecutor` with atleast one worker,
                       defaults to None.
     :type watchdog: instance
     :param timeout: timeout in seconds for watchdog
@@ -48,7 +48,7 @@ class Command():
     """
     def __init__(self, protocol, command, answer, watchdog = None, timeout = None):
         self._protocol = protocol
-        self._Advanced_Command = command
+        self._command = command
         self._answer = answer
         if not watchdog:
             self._watchdog = concurrent.futures.ThreadPoolExecutor(max_workers=1)
@@ -64,14 +64,12 @@ class Command():
         self._future.cancel() # future has to be cancelled so that done() returns True
 
     def __call__(self):
-        """Transmit command to controller and start watchdog to check if answer is
-        returnd befor timeout.
-        """
+        """Transmit command to controller and start watchdog to check in answer is returnd before timeout."""
         if self._future.done():
             with self._condition:
                 self._state = False
                 self._receive_observer.subscribe(self._receive_task)
-                self._protocol.send(self._Advanced_Command)
+                self._protocol.send(self._command)
                 self._future = self._watchdog.submit(self._watchdog_task, self.timeout)
 
     def wait(self, timeout = None):
@@ -86,14 +84,14 @@ class Command():
         try:
             self._future.result(timeout = timeout)
         except Exception as e:
-            raise RuntimeError(f"A timeout occured when waiting for  answer {self._answer} of command {self._Advanced_Command}!") from e
+            raise RuntimeError(f"A timeout occured when waiting for  answer {self._answer} of command {self._command}!") from e
 
     def _watchdog_task(self, timeout):
         """ Task of watchdog therad.
         """
         with self._condition:
             if not self._condition.wait(timeout = self.timeout):
-                raise RuntimeError(f"A timeout occured during command {self._Advanced_Command}!")
+                raise RuntimeError(f"A timeout occured during command {self._command}!")
             self._receive_observer.unsubscribe(self._receive_task)
 
     def _receive_task(self, data):
@@ -125,17 +123,17 @@ class Command():
 class _Advanced_Command(Command):
     """Prepare :class:`Command` to be used as parent class in specific command class.
     """
-    _Advanced_Command = None
+    _COMMAND = None
     _ANSWER = None
     _executor = None
 
     def __init__(self, *args, **kwargs ):
-        super(_Advanced_Command,self).__init__(*args, command = self._Advanced_Command, answer = self._ANSWER, watchdog = self._executor, **kwargs)
+        super(_Advanced_Command,self).__init__(*args, command = self._COMMAND, answer = self._ANSWER, watchdog = self._executor, **kwargs)
 
 class Out(_Advanced_Command):
     """Transmit command "move_out" and keepts track of answer "pos_out"
     """
-    _Advanced_Command = "move_out"
+    _COMMAND = "move_out"
     _ANSWER = "pos_out"
     _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
@@ -143,7 +141,7 @@ class Out(_Advanced_Command):
 class In(_Advanced_Command):
     """Transmit command "move_in" and keepts track of answer "pos_in"
     """
-    _Advanced_Command = "move_in"
+    _COMMAND = "move_in"
     _ANSWER = "pos_in"
     _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
@@ -151,7 +149,7 @@ class In(_Advanced_Command):
 class Clockwise(_Advanced_Command):
     """Transmit command "rot_cw+STEPS" and keepts track of answer "rot_stopped"
     """
-    _Advanced_Command = "rot_cw"
+    _COMMAND = "rot_cw"
     _ANSWER = "rot_stopped"
     _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
@@ -161,14 +159,14 @@ class Clockwise(_Advanced_Command):
         :param steps: Number of steps to be rotated
         :type steps: int
         """
-        self._Advanced_Command = self._Advanced_Command + '+' + steps
+        self._COMMAND = self._COMMAND + '+' + steps
         super(Clockwise,self).__call__()
 
 
 class CounterClockwise(_Advanced_Command):
     """Transmit command "rot_ccw+STEPS" and keepts track of answer "rot_stopped"
     """
-    _Advanced_Command = "rot_ccw"
+    _COMMAND = "rot_ccw"
     _ANSWER = "rot_stopped"
     _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
@@ -178,14 +176,14 @@ class CounterClockwise(_Advanced_Command):
         :param steps: Number of steps to be rotated
         :type steps: int
         """
-        self._Advanced_Command = self._Advanced_Command + '+' + steps
+        self._COMMAND = self._COMMAND + '+' + steps
         super(CounterClockwise,self).__call__()
 
 
 class Open(_Advanced_Command):
     """"Transmit command "open_shutter" and keepts track of answer "shutter_opened"
     """
-    _Advanced_Command = "open_shutter"
+    _COMMAND = "open_shutter"
     _ANSWER = "shutter_opened"
     _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
@@ -193,7 +191,7 @@ class Open(_Advanced_Command):
 class Close(_Advanced_Command):
     """"Transmit command "close_shutter" and keepts track of answer "shutter_closed"
     """
-    _Advanced_Command = "close_shutter"
+    _COMMAND = "close_shutter"
     _ANSWER = "shutter_closed"
     _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
@@ -201,7 +199,7 @@ class Close(_Advanced_Command):
 class StopMove(_Advanced_Command):
     """"Transmit command "stop_lin" and keepts track of answer "lin_stopped"
     """
-    _Advanced_Command = "stop_lin"
+    _COMMAND = "stop_lin"
     _ANSWER = "lin_stopped"
     _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
@@ -209,7 +207,7 @@ class StopMove(_Advanced_Command):
 class StopRotate(_Advanced_Command):
     """"Transmit command "stop_rot" and keepts track of answer "rot_stopped"
     """
-    _Advanced_Command = "stop_rot"
+    _COMMAND = "stop_rot"
     _ANSWER = "rot_stopped"
     _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
@@ -217,7 +215,7 @@ class StopRotate(_Advanced_Command):
 class Stop(_Advanced_Command):
     """"Transmit command "stop_all" and keepts track of answer "all_stopped"
     """
-    _Advanced_Command = "stop_all"
+    _COMMAND = "stop_all"
     _ANSWER = "all_stopped"
     _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
