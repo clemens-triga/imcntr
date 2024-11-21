@@ -1,0 +1,18 @@
+[[package]]
+name = "pyserial"
+version = "3.5"
+description = "Python Serial Port Extension"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.extras]
+cp2110 = ["hidapi"]
+
+[metadata]
+lock-version = "1.1"
+python-versions = "^3.11.9"
+content-hash = "f00fcc9945767851724bd96e119d92afabd5fc6f4b6d3e98a950c2d0582c09b0"
+
+[metadata.files]
+pyserial = []
