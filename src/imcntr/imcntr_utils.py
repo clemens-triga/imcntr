@@ -1,6 +1,5 @@
 class Observer():
-    """Implements the observer design pattern by providing a list where observer
-    can subscribe and get called when the subject of interrest notifys them.
+    """Implements the observer design pattern by providing a list where observers can subscribe and get called when the subject of interest notifies them.
     """
     def __init__(self):
         self.observer = []
@@ -19,10 +18,7 @@ class Observer():
             self.observer.append(observer_to_subscribe)
 
     def unsubscribe(self, target = None, *args, all = False, **kwargs):
-        """Remove observer frome list. If no :obj:`target` is given all observers
-        are removed, if :obj:`all` is true all observers with same :obj:`target` are
-        removed. Otherwise :obj:`target`, :obj:`*args` and :obj:`**kwargs` musst
-        be the same as subscribing.
+        """Remove observer from list. If no :obj:`target` is given all observers are removed, if :obj:`all` is true all observers with same :obj:`target` are removed. Otherwise :obj:`target`, :obj:`*args` and :obj:`**kwargs` musst be the same as subscribing.
 
         :param target: Tartget object of observed subject.
         :type port: callable
@@ -45,8 +41,7 @@ class Observer():
                 self.observer.remove(observer)
 
     def call(self, *args, **kwargs):
-        """Calls each target with its argumetns and keyword arguments in observer list.
-        Also provides the possibility to pass over own arguments to the callable tartget.
+        """alls each target with its arguments and keyword arguments in observer list. Also provides the possibility to pass over own arguments to the callable tartget.
 
         :raise RuntimeError: Some other exception occured during call of observer
         :raise TypeError: Number of required arguments don't match passed arguments

@@ -1,223 +1,138 @@
 from .imcntr_connection import SerialCommunication
+from .imcntr_communication import MessageExchange, WaitForMessage, SendMessage
 from .imcntr_utils import Observer
 import threading
 import concurrent.futures
 
-class CommandCommunication(SerialCommunication):
-    """Expans :class:`SerialCommunication` with observers to be called when
-    data is received or conncetion is lost.
+
+class _Advanced_Wait(WaitForMessage):
+    """Prepare :class:`WaitForMessage` to be used as a parent class by only giving the expected message as a class constant.
     """
-    def __init__(self, *args):
-        super(CommandCommunication,self).__init__(*args)
-        self.receive_observer = Observer()
-        self.connection_lost_observer = Observer()
-
-    def receive(self, data):
-        """When called subsequently calls subscribed observers.
-
-        ..:note: Method is called when new data is available at serial port
-        """
-        self.receive_observer.call(data)
-
-    def connection_lost(self, e):
-        """When connection is closed subsequently calls subscribed observers.
-        """
-        self.connection_lost_observer.call()
-        super(CommandCommunication,self).connection_lost(e)
-
-
-class Command():
-    """Implements a watchdog for commands to take care of the expected answer to
-    be sent back by the controller befor a timeout ouccres. Additionaly gives
-    the possibility to wait for the answer by blocking the command sending thread.
-    Also provides the possibility to be used in a context manger.
-
-    :param protocol: Instance of :class:`CommandCommunication` with open conncetion
-    :type protocol: instance
-    :param command: Command to be sent to the controller
-    :type command: str
-    :param answer: Ansewer from controller corresponding to command
-    :type answer: str
-    :param watchdog:  Instance of :class:`ThreadPoolExecutor` with atleast one worker,
-                      defaults to None.
-    :type watchdog: instance
-    :param timeout: timeout in seconds for watchdog
-    :type timeout: float
-
-    ..seealso:: <https://docs.python.org/dev/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor>
-    """
-    def __init__(self, protocol, command, answer, watchdog = None, timeout = None):
-        self._protocol = protocol
-        self._command = command
-        self._answer = answer
-        if not watchdog:
-            self._watchdog = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        else:
-            self._watchdog = watchdog
-        self.timeout = timeout
-        self.state = None
-        self._receive_observer = self._protocol.receive_observer
-        self._connection_lost_observer = self._protocol.connection_lost_observer
-        self._connection_lost_observer.subscribe(self.shutdown)
-        self._condition =  threading.Condition()
-        self._future = concurrent.futures.Future()
-        self._future.cancel() # future has to be cancelled so that done() returns True
-
-    def __call__(self):
-        """Transmit command to controller and start watchdog to check in answer is returnd before timeout."""
-        if self._future.done():
-            with self._condition:
-                self._state = False
-                self._receive_observer.subscribe(self._receive_task)
-                self._protocol.send(self._command)
-                self._future = self._watchdog.submit(self._watchdog_task, self.timeout)
-
-    def wait(self, timeout = None):
-        """Blocks until the answer was returned. If no timeout is passed the watchdog
-        timeout is used
-
-        :param timeout: time in seconds to be waited for answer, defaults to None
-        :type timeout:
-        :raise RuntimeError: If a timeout occures
-        """
-        timeout = timeout or self.timeout
-        try:
-            self._future.result(timeout = timeout)
-        except Exception as e:
-            raise RuntimeError(f"A timeout occured when waiting for  answer {self._answer} of command {self._command}!") from e
-
-    def _watchdog_task(self, timeout):
-        """ Task of watchdog therad.
-        """
-        with self._condition:
-            if not self._condition.wait(timeout = self.timeout):
-                raise RuntimeError(f"A timeout occured during command {self._command}!")
-            self._receive_observer.unsubscribe(self._receive_task)
-
-    def _receive_task(self, data):
-        """Is called by receive observer when data was received
-        """
-        if data == self._answer:
-            with self._condition :
-                self._state = True
-                self._condition.notify()
-
-    def shutdown(self):
-        """Stops watchdog when connection is closed.
-        """
-        with self._condition :
-            self._condition.notify()
-        self._connection_lost_observer.unsubscribe(self.shutdown)
-
-    def __enter__(self):
-        """ Enter context.
-        """
-        return self
-
-    def __exit__(self, type, value, traceback):
-        """Leave context, stop watchdog.
-        """
-        self.shutdown()
-
-
-class _Advanced_Command(Command):
-    """Prepare :class:`Command` to be used as parent class in specific command class.
-    """
-    _COMMAND = None
-    _ANSWER = None
-    _executor = None
+    _EXPECTED_MESSAGE = None
 
     def __init__(self, *args, **kwargs ):
-        super(_Advanced_Command,self).__init__(*args, command = self._COMMAND, answer = self._ANSWER, watchdog = self._executor, **kwargs)
+        super(_Advanced_Wait, self).__init__(*args, message=self._EXPECTED_MESSAGE, **kwargs)
+
+class _Advanced_Command(SendMessage):
+    """Prepare :class:`SendMessage` to be used as a parent class by only giving the outgoing command and expected message as class constants.
+    """
+    _OUTGOING_MESSAGE = None
+    _EXPECTED_MESSAGE = None
+
+    def __init__(self, *args, **kwargs ):
+        super(_Advanced_Command, self).__init__(*args, command=self._OUTGOING_MESSAGE, message=self._EXPECTED_MESSAGE, **kwargs)
+
+class Ready(_Advanced_Wait):
+    """Offers a method to wait for the message "controller_ready". The controller sends this message after successful startup.
+    """
+    _EXPECTED_MESSAGE = "controller_ready"
+
+
+class Connected(_Advanced_Command):
+    """Check if the controller is connected by transmitting the command "connect" when called. Also offers to wait for the message "connected".
+    """
+    _OUTGOING_MESSAGE = "connect"
+    _EXPECTED_MESSAGE = "connected"
+
 
 class Out(_Advanced_Command):
-    """Transmit command "move_out" and keepts track of answer "pos_out"
+    """Moves the sample out by transmitting the command "move_out" when called. Also offers to wait for the message "pos_out" after the movement is finished.
     """
-    _COMMAND = "move_out"
-    _ANSWER = "pos_out"
-    _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-
+    _OUTGOING_MESSAGE = "move_out"
+    _EXPECTED_MESSAGE = "pos_out"
 
 class In(_Advanced_Command):
-    """Transmit command "move_in" and keepts track of answer "pos_in"
+    """Moves the sample in by transmitting the command "move_in" when called. Also offers to wait for the message "pos_in" after the movement is finished.
     """
-    _COMMAND = "move_in"
-    _ANSWER = "pos_in"
-    _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-
+    _OUTGOING_MESSAGE = "move_in"
+    _EXPECTED_MESSAGE = "pos_in"
 
 class Clockwise(_Advanced_Command):
-    """Transmit command "rot_cw+STEPS" and keepts track of answer "rot_stopped"
+    """Rotates the sample clockwise by the given steps by sending the "rot_cw+STEPS" command when called. Also offers to wait for the message "rot_stopped" after the movement is finished.
     """
-    _COMMAND = "rot_cw"
-    _ANSWER = "rot_stopped"
-    _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    _OUTGOING_MESSAGE = "rot_cw"
+    _EXPECTED_MESSAGE = "rot_stopped"
 
     def __call__(self, steps):
-        """Befor transmitting command to controller adds :data:`steps`.
+        """Before transmitting the command to the controller, adds :data:`steps`.
 
         :param steps: Number of steps to be rotated
         :type steps: int
         """
-        self._COMMAND = self._COMMAND + '+' + steps
-        super(Clockwise,self).__call__()
-
+        self._OUTGOING_MESSAGE = self._OUTGOING_MESSAGE + '+' + str(steps)
+        super(Clockwise, self).__call__()
 
 class CounterClockwise(_Advanced_Command):
-    """Transmit command "rot_ccw+STEPS" and keepts track of answer "rot_stopped"
+    """Rotates the sample counterclockwise by the given steps by sending the "rot_ccw+STEPS" command when called. Also offers to wait for the message "rot_stopped" after the movement is finished.
     """
-    _COMMAND = "rot_ccw"
-    _ANSWER = "rot_stopped"
-    _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    _OUTGOING_MESSAGE = "rot_ccw"
+    _EXPECTED_MESSAGE = "rot_stopped"
 
     def __call__(self, steps):
-        """Befor transmitting command to controller adds :data:`steps`.
+        """Before transmitting the command to the controller, adds :data:`steps`.
 
         :param steps: Number of steps to be rotated
         :type steps: int
         """
-        self._COMMAND = self._COMMAND + '+' + steps
-        super(CounterClockwise,self).__call__()
-
+        self._OUTGOING_MESSAGE = self._OUTGOING_MESSAGE + '+' + str(steps)
+        super(CounterClockwise, self).__call__()
 
 class Open(_Advanced_Command):
-    """"Transmit command "open_shutter" and keepts track of answer "shutter_opened"
+    """Opens the shutter by transmitting the command "open_shutter" when called. Also offers to wait for the message "shutter_opened" after the shutter is opened.
     """
-    _COMMAND = "open_shutter"
-    _ANSWER = "shutter_opened"
-    _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    _OUTGOING_MESSAGE = "open_shutter"
+    _EXPECTED_MESSAGE = "shutter_opened"
 
 
 class Close(_Advanced_Command):
-    """"Transmit command "close_shutter" and keepts track of answer "shutter_closed"
+    """Closes the shutter by transmitting the command "close_shutter" when called. Also offers to wait for the message "shutter_closed" after the shutter is closed.
     """
-    _COMMAND = "close_shutter"
-    _ANSWER = "shutter_closed"
-    _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    _OUTGOING_MESSAGE = "close_shutter"
+    _EXPECTED_MESSAGE = "shutter_closed"
 
 
 class StopMove(_Advanced_Command):
-    """"Transmit command "stop_lin" and keepts track of answer "lin_stopped"
+    """Stops linear movement by transmitting the command "stop_lin" when called. Also offers to wait for the message "lin_stopped" after the stop has taken place.
     """
-    _COMMAND = "stop_lin"
-    _ANSWER = "lin_stopped"
-    _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-
+    _OUTGOING_MESSAGE = "stop_lin"
+    _EXPECTED_MESSAGE = "lin_stopped"
 
 class StopRotate(_Advanced_Command):
-    """"Transmit command "stop_rot" and keepts track of answer "rot_stopped"
+    """Stops rotational movement by transmitting the command "stop_rot" when called. Also offers to wait for the message "rot_stopped" after the stop has taken place.
     """
-    _COMMAND = "stop_rot"
-    _ANSWER = "rot_stopped"
-    _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-
+    _OUTGOING_MESSAGE = "stop_rot"
+    _EXPECTED_MESSAGE = "rot_stopped"
 
 class Stop(_Advanced_Command):
-    """"Transmit command "stop_all" and keepts track of answer "all_stopped"
+    """Stops all movement by transmitting the command "stop_all" when called. Also offers to wait for the message "all_stopped" after the stop has taken place.
     """
-    _COMMAND = "stop_all"
-    _ANSWER = "all_stopped"
-    _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    _OUTGOING_MESSAGE = "stop_all"
+    _EXPECTED_MESSAGE = "all_stopped"
+
+
+class Controller():
+    """Prvides a set of functionality
+    """
+    def __init__(self, *args, **kwargs):
+        self.ready = Ready(*args, **kwargs)
+        self.connected = Connected(*args, **kwargs)
+
+class Sample():
+    def __init__(self, *args, **kwargs):
+        self.move_out = Out(*args, **kwargs)
+        self.move_in = In(*args, **kwargs)
+        self.move_stop = StopMove(*args, **kwargs)
+        self.rotate_cw = Clockwise(*args, **kwargs)
+        self.rotate_ccw = CounterClockwise(*args, **kwargs)
+        self.rotate_stop = StopRotate(*args, **kwargs)
+        self.stop = Stop(*args, **kwargs)
+
+
+class Shutter():
+
+    def __init__(self, *args, **kwargs):
+        self.open = Open(*args, **kwargs)
+        self.close = Close(*args, **kwargs)
 
 
 if __name__ == '__main__':
