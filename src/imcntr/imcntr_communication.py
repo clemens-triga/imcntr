@@ -4,8 +4,12 @@ import threading
 import concurrent.futures
 
 class MessageExchange(SerialCommunication):
-    """Expands :class:`SerialCommunication` with observers to be called when
-    data is received or connection is lost.
+    """
+    Expands :class:`SerialCommunication` with observers to be called when data is received
+    or connection is lost.
+
+    :param args: Arguments passed to the parent :class:`SerialCommunication` class.
+    :param kwargs: Keyword arguments passed to the parent :class:`SerialCommunication` class.
     """
     def __init__(self, *args, **kwargs):
         super(MessageExchange, self).__init__(*args)
@@ -13,27 +17,37 @@ class MessageExchange(SerialCommunication):
         self.connection_lost_observer = Observer()
 
     def receive(self, data):
-        """When called, subsequently calls subscribed observers.
+        """
+        Called when new data is available at the serial port. It subsequently calls
+        all the subscribed observers.
 
-        .. note:: Method is called when new data is available at the serial port.
+        :param data: Data received on the serial port.
+        :type data: str
         """
         self.receive_observer.call(data)
 
     def connection_lost(self, e):
-        """When connection is closed, subsequently calls subscribed observers.
+        """
+        Called when the connection is closed. It subsequently calls all the subscribed
+        observers for connection loss.
+
+        :param e: The exception that caused the connection to be lost.
+        :type e: Exception
         """
         self.connection_lost_observer.call()
         super(MessageExchange, self).connection_lost(e)
 
 class WaitForMessage():
-    """Gives the possibility to wait for an incoming message from the connected controller until a timeout occurs.
+    """
+    Provides the ability to wait for an incoming message from the connected controller
+    until a timeout occurs.
 
-    :param protocol: Instance of :class:`MessageExchange` with an open connection
-    :type protocol: instance
-    :param message: Incoming message to be waited for
+    :param protocol: Instance of :class:`MessageExchange` with an open connection.
+    :type protocol: :class:`MessageExchange`
+    :param message: Incoming message to be waited for.
     :type message: str
-    :param timeout: Timeout in seconds to wait, defaults to None
-    :type timeout: float
+    :param timeout: Timeout in seconds to wait, defaults to None.
+    :type timeout: float, optional
     """
     def __init__(self, protocol, message, timeout=None):
         self._protocol = protocol
@@ -43,11 +57,13 @@ class WaitForMessage():
         self._condition = threading.Condition()
 
     def wait(self, timeout=None):
-        """Blocks until the expected message is received. If no timeout is passed, the instance timeout is used.
+        """
+        Blocks until the expected message is received. If no timeout is passed, the
+        instance timeout is used.
 
-        :param timeout: Time in seconds to be waited for message, defaults to None
-        :type timeout: float
-        :raise RuntimeError: If a timeout occurs
+        :param timeout: Time in seconds to wait for the message. Defaults to None.
+        :type timeout: float, optional
+        :raise RuntimeError: If a timeout occurs before receiving the expected message.
         """
         timeout = timeout or self.timeout
         with self._condition:
@@ -57,7 +73,11 @@ class WaitForMessage():
             self._receive_observer.unsubscribe(self._receive_message)
 
     def _receive_message(self, data):
-        """Is called by the receive observer when data is received.
+        """
+        Called by the receive observer when data is received.
+
+        :param data: Data received from the controller.
+        :type data: str
         """
         if data == self.expect_message:
             with self._condition:
@@ -65,10 +85,15 @@ class WaitForMessage():
                 self._condition.notify()
 
 class SendMessage(WaitForMessage):
-    """Expands :class:`WaitForMessage` with functionality for sending a defined
-    command by calling the instance.
+    """
+    Expands :class:`WaitForMessage` with functionality for sending a defined command by
+    calling the instance.
 
-    :param command: Command to be sent to the controller
+    :param protocol: Instance of :class:`MessageExchange` with an open connection.
+    :type protocol: :class:`MessageExchange`
+    :param message: Incoming message to be waited for.
+    :type message: str
+    :param command: Command to be sent to the controller.
     :type command: str
     """
     def __init__(self, *args, command, **kwargs):
@@ -76,7 +101,10 @@ class SendMessage(WaitForMessage):
         super(SendMessage, self).__init__(*args, **kwargs)
 
     def __call__(self):
-        """Send command to the controller via protocol.
+        """
+        Sends the command to the controller via the protocol.
+
+        :raises RuntimeError: If sending the message fails.
         """
         self._protocol.send(self.outgoing_command)
 

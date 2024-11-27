@@ -1,58 +1,85 @@
 class Observer():
-    """Implements the observer design pattern by providing a list where observers can subscribe and get called when the subject of interest notifies them.
     """
+    Implements the Observer design pattern, allowing multiple observers to subscribe to a subject
+    and be notified when the subject triggers an event. Observers can subscribe with additional arguments
+    or keyword arguments, and the `call` method allows notifying them with specific data.
+
+    Attributes:
+        observer (list): A list that holds all the observers and their respective arguments and keyword arguments.
+    """
+
     def __init__(self):
+        """
+        Initializes the Observer object with an empty list to hold observers.
+
+        This list will store dictionaries containing the target callable and its associated arguments
+        and keyword arguments.
+        """
         self.observer = []
 
     def subscribe(self, target, *args, **kwargs):
-        """Appends target with optional arguments or keyword arguments
-        to the observer list.
-
-        :param target: Tartget to be called from subject.
-        :type port: callable
-        :param args: Variable length argument list, passed to the target when called
-        :param kwargs: Arbitrary keyword arguments, passed to the target when called
         """
-        observer_to_subscribe = {'target' : target, 'arguments' : args, 'kwarguments' : kwargs}
-        if observer_to_subscribe  not in self.observer:
+        Subscribes a new observer to the subject. The observer is added to the list with any optional arguments
+        or keyword arguments provided.
+
+        :param target: The target function or callable to be notified.
+        :type target: callable
+        :param args: Variable-length argument list that will be passed to the target when called.
+        :param kwargs: Arbitrary keyword arguments to be passed to the target when called.
+        """
+        observer_to_subscribe = {'target': target, 'arguments': args, 'kwarguments': kwargs}
+
+        # Ensure that the observer is not already in the list before adding.
+        if observer_to_subscribe not in self.observer:
             self.observer.append(observer_to_subscribe)
 
-    def unsubscribe(self, target = None, *args, all = False, **kwargs):
-        """Remove observer from list. If no :obj:`target` is given all observers are removed, if :obj:`all` is true all observers with same :obj:`target` are removed. Otherwise :obj:`target`, :obj:`*args` and :obj:`**kwargs` musst be the same as subscribing.
+    def unsubscribe(self, target=None, *args, all=False, **kwargs):
+        """
+        Unsubscribes an observer from the list. Can remove all observers, remove only observers with the exact same
+        parameters, or remove all observers of a specific target if `all` is set to True.
 
-        :param target: Tartget object of observed subject.
-        :type port: callable
-        :param all: Specifies if all observer with same :obj:`target` are removed from list
+        :param target: The target observer to be removed.
+        :type target: callable, optional
+        :param all: A flag to indicate if all observers of the given target should be removed. Defaults to False.
         :type all: bool
-        :param args: Variable length argument list, passed to the target when called
-        :param kwargs: Arbitrary keyword arguments, passed to the target when called
+        :param args: Optional arguments that must match the subscribed arguments for removal.
+        :param kwargs: Arbitrary keyword arguments to match for removal.
         """
         if target:
+            # If specific target is provided and 'all' is False, remove the observer with matching target and arguments.
             if not all:
-                obersver_to_unsubscribe={'target' : target, 'arguments' : args, 'kwarguments' : kwargs}
-                if obersver_to_unsubscribe in self.observer:
-                    self.observer.remove(obersver_to_unsubscribe)
+                observer_to_unsubscribe = {'target': target, 'arguments': args, 'kwarguments': kwargs}
+                if observer_to_unsubscribe in self.observer:
+                    self.observer.remove(observer_to_unsubscribe)
             else:
+                # If 'all' is True, remove all observers with the matching target.
                 for observer in self.observer[:]:
                     if observer['target'] == target:
                         self.observer.remove(observer)
         else:
-            for observer in self.observer[:]:
-                self.observer.remove(observer)
+            # If no target is provided, remove all observers.
+            self.observer.clear()
 
     def call(self, *args, **kwargs):
-        """alls each target with its arguments and keyword arguments in observer list. Also provides the possibility to pass over own arguments to the callable tartget.
+        """
+        Calls each subscribed observer with the arguments and keyword arguments passed to `call()`.
+        Additionally, observers can be called with their specific arguments that were provided during subscription.
 
-        :raise RuntimeError: Some other exception occured during call of observer
-        :raise TypeError: Number of required arguments don't match passed arguments
+        :param args: Arguments that will be passed to each observer along with its subscribed arguments.
+        :param kwargs: Keyword arguments that will be passed to each observer along with its subscribed kwargs.
+        :raises RuntimeError: If an error occurs while calling the observer function.
+        :raises TypeError: If the number of arguments provided does not match the target function's signature.
         """
         for observer in self.observer:
             try:
+                # Call the observer's target with its arguments and additional ones passed to call.
                 observer['target'](*observer['arguments'], *args, **observer['kwarguments'], **kwargs)
             except TypeError as e:
+                # Handle argument mismatch
                 raise TypeError("Wrong number of arguments when calling observer!") from e
             except Exception as e:
-                raise RuntimeError("Some Exception occured during observer call") from e
+                # Catch any other exceptions thrown by the observer function
+                raise RuntimeError("An exception occurred while calling observer!") from e
 
 if __name__ == '__main__':
     exit(0)
