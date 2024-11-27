@@ -4,8 +4,7 @@ class Observer():
     and be notified when the subject triggers an event. Observers can subscribe with additional arguments
     or keyword arguments, and the `call` method allows notifying them with specific data.
 
-    Attributes:
-        observer (list): A list that holds all the observers and their respective arguments and keyword arguments.
+
     """
 
     def __init__(self):

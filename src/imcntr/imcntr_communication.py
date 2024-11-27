@@ -1,7 +1,6 @@
 from .imcntr_connection import SerialCommunication
 from .imcntr_utils import Observer
 import threading
-import concurrent.futures
 
 class MessageExchange(SerialCommunication):
     """

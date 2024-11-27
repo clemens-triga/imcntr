@@ -1,15 +1,9 @@
-from .imcntr_connection import SerialCommunication
-from .imcntr_communication import MessageExchange, WaitForMessage, SendMessage
-from .imcntr_utils import Observer
-import threading
-import concurrent.futures
-
+from .imcntr_communication import WaitForMessage, SendMessage
 
 class _Advanced_Wait(WaitForMessage):
     """
     A base class for waiting for a specific message from the controller. This class
-    extends :class:`WaitForMessage` and simplifies the usage by setting the expected
-    message as a class constant.
+    extends :class:`WaitForMessage` and simplifies the usage by setting the expected message as a class constant.
 
     :param args: Arguments passed to the parent :class:`WaitForMessage` class.
     :param kwargs: Keyword arguments passed to the parent :class:`WaitForMessage` class.
@@ -33,8 +27,7 @@ class _Advanced_Wait(WaitForMessage):
 class _Advanced_Command(SendMessage):
     """
     A base class for sending commands to the controller and waiting for a response.
-    This class extends :class:`SendMessage` and simplifies usage by setting the outgoing
-    command and expected response message as class constants.
+    This class extends :class:`SendMessage` and simplifies usage by setting the outgoing command and expected response message as class constants.
 
     :param args: Arguments passed to the parent :class:`SendMessage` class.
     :param kwargs: Keyword arguments passed to the parent :class:`SendMessage` class.
@@ -125,8 +118,8 @@ class Clockwise(_Advanced_Command):
     Sends the `"rot_cw+STEPS"` command to rotate the sample clockwise by the given number
     of steps. Waits for the response `"rot_stopped"` after the rotation is finished.
 
-    :param steps: The number of steps to rotate the sample.
-    :type steps: int
+    :param args: Arguments passed to the parent :class:`_Advanced_Command` class.
+    :param kwargs: Keyword arguments passed to the parent :class:`_Advanced_Command` class.
 
     :ivar _OUTGOING_MESSAGE: The outgoing command (`"rot_cw"`).
     :type _OUTGOING_MESSAGE: str
@@ -153,8 +146,8 @@ class CounterClockwise(_Advanced_Command):
     Sends the `"rot_ccw+STEPS"` command to rotate the sample counterclockwise by the given
     number of steps. Waits for the response `"rot_stopped"` after the rotation is finished.
 
-    :param steps: The number of steps to rotate the sample.
-    :type steps: int
+    :param args: Arguments passed to the parent :class:`_Advanced_Command` class.
+    :param kwargs: Keyword arguments passed to the parent :class:`_Advanced_Command` class.
 
     :ivar _OUTGOING_MESSAGE: The outgoing command (`"rot_ccw"`).
     :type _OUTGOING_MESSAGE: str
