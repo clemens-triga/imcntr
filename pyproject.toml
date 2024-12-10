@@ -12,6 +12,7 @@ pyserial = ">=3.5"
 sphinx-rtd-theme = "^3.0.2"
 sphinx-autoapi = "^3.3.3"
 myst-nb = {version = "^1.1.2", python = "^3.9"}
+jupyter = "^1.1.1"
 
 [tool.poetry.dev-dependencies]
 
