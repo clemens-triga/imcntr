@@ -21,7 +21,7 @@ class Connected(GiveOrder):
     """
     def __init__(self, *args, **kwargs):
         order = "connect"
-        response = connected"
+        response = "connected"
         super(Connected, self).__init__(*args, order = order, response = response, **kwargs)
 
 
@@ -72,7 +72,7 @@ class Clockwise(GiveOrder):
         :type steps: int
         """
         if steps:
-            order = self.order.split('+',1)[0] + "+" + str(steps))
+            order = self.order.split('+',1)[0] + "+" + str(steps)
             super(Clockwise, self).__call__(order)
         else:
             super(Clockwise, self).__call__()
