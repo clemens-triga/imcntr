@@ -36,39 +36,38 @@ class MessageExchange(SerialCommunication):
         self.connection_lost_observer.call()
         super(MessageExchange, self).connection_lost(e)
 
-class WaitForMessage():
+class WaitForResponse():
     """
-    Provides the ability to wait for an incoming message from the connected controller
-    until a timeout occurs.
+    Provides the ability to wait for a given response from the connected controller until a timeout occurs. The desired response is defined by creating an instance.
 
     :param protocol: Instance of :class:`MessageExchange` with an open connection.
     :type protocol: :class:`MessageExchange`
-    :param message: Incoming message to be waited for.
-    :type message: str
-    :param timeout: Timeout in seconds to wait, defaults to None.
+    :param response: Response to be waited for.
+    :type response: str
+    :param timeout: Timeout in seconds to wait for response, defaults to None.
     :type timeout: float, optional
     """
-    def __init__(self, protocol, message, timeout=None):
+    def __init__(self, protocol, response, timeout=None):
         self._protocol = protocol
-        self.expect_message = message
+        self.response = response
         self.timeout = timeout
         self._receive_observer = self._protocol.receive_observer
         self._condition = threading.Condition()
 
     def wait(self, timeout=None):
         """
-        Blocks until the expected message is received. If no timeout is passed, the
+        Blocks until the response is received. If no timeout is passed, the
         instance timeout is used.
 
-        :param timeout: Time in seconds to wait for the message. Defaults to None.
+        :param timeout: Time in seconds to wait for response. Defaults to None.
         :type timeout: float, optional
-        :raise RuntimeError: If a timeout occurs before receiving the expected message.
+        :raise RuntimeError: If a timeout occurs before receiving the response.
         """
         timeout = timeout or self.timeout
         with self._condition:
-            self._receive_observer.subscribe(self._receive_message)
+            self._receive_observer.subscribe(self._receive_response)
             if not self._condition.wait(timeout=timeout):
-                raise RuntimeError(f"A timeout occurred when waiting for incoming message {self.expect_message}!")
+                raise RuntimeError(f"A timeout occurred when waiting for controller response {self.response}!")
             self._receive_observer.unsubscribe(self._receive_message)
 
     def _receive_message(self, data):
@@ -78,34 +77,37 @@ class WaitForMessage():
         :param data: Data received from the controller.
         :type data: str
         """
-        if data == self.expect_message:
+        if data == self.response:
             with self._condition:
                 self._state = True
                 self._condition.notify()
 
-class SendMessage(WaitForMessage):
+class GiveOrder(WaitForResponse):
     """
-    Expands :class:`WaitForMessage` with functionality for sending a defined command by
-    calling the instance.
+    Expands :class:`WaitForResponse` with functionality for issue an order. The desired command is defined by creating an instance. Calling the instance sends it to the controller.
 
     :param protocol: Instance of :class:`MessageExchange` with an open connection.
     :type protocol: :class:`MessageExchange`
-    :param message: Incoming message to be waited for.
-    :type message: str
-    :param command: Command to be sent to the controller.
-    :type command: str
+    :param response: Response to be waited for.
+    :type response: str
+    :param order: Order issued to controller.
+    :type order: str
     """
-    def __init__(self, *args, command, **kwargs):
-        self.outgoing_command = command
-        super(SendMessage, self).__init__(*args, **kwargs)
+    def __init__(self, *args, order = None, **kwargs):
+        self.order = order
+        super(GiveOrder, self).__init__(*args, **kwargs)
 
-    def __call__(self):
+    def __call__(self, order = None):
         """
-        Sends the command to the controller via the protocol.
+        Sends order to the controller via protocol. If no order is given instance order is passed.
 
-        :raises RuntimeError: If sending the message fails.
+        :param order: Order issued to controller.
+        :type order: str
         """
-        self._protocol.send(self.outgoing_command)
+        if order:
+            self._protocol.send(order)
+        else:
+            self._protocol.send(self.order)
 
 if __name__ == '__main__':
     exit(0)
