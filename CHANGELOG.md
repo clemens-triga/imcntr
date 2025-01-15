@@ -6,6 +6,8 @@
 
 ### Feature
 
+- Rename same objects for better understanding
+
 - Add possibility to send instance order or order given as argument when calling instance of `GiveOrder` class.
 
 - Remove `_Advanced_Command` and `_Advanced_Wait` class for better readability.
