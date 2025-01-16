@@ -65,7 +65,7 @@ class WaitForResponse():
         """
         timeout = timeout or self.timeout
         with self._condition:
-            self._receive_observer.subscribe(self._receive_response)
+            self._receive_observer.subscribe(self._receive_message)
             if not self._condition.wait(timeout=timeout):
                 raise RuntimeError(f"A timeout occurred when waiting for controller response {self.response}!")
             self._receive_observer.unsubscribe(self._receive_message)
