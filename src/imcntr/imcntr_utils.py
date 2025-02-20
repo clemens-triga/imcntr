@@ -32,6 +32,22 @@ class Observer():
         if observer_to_subscribe not in self.observer:
             self.observer.append(observer_to_subscribe)
 
+    def subscribe_first(self, target, *args, **kwargs):
+        """
+        Subscribes a new observer to the subject. The observer is added to the list at the first position with any optional arguments
+        or keyword arguments provided.
+
+        :param target: The target function or callable to be notified.
+        :type target: callable
+        :param args: Variable-length argument list that will be passed to the target when called.
+        :param kwargs: Arbitrary keyword arguments to be passed to the target when called.
+        """
+        observer_to_subscribe = {'target': target, 'arguments': args, 'kwarguments': kwargs}
+
+        # Ensure that the observer is not already in the list before adding.
+        if observer_to_subscribe not in self.observer:
+            self.observer.insert(0, observer_to_subscribe)
+
     def unsubscribe(self, target=None, *args, all=False, **kwargs):
         """
         Unsubscribes an observer from the list. Can remove all observers, remove only observers with the exact same
