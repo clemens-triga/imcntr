@@ -2,6 +2,20 @@
 
 <!--next-version-placeholder-->
 
+## v0.3.0 (20/02/2025)
+
+### Feature
+
+- Add method for observer class to insert subscriber at first position of observer list.
+
+- Create an observer for send method. Which is called when data is sent
+
+### Documentation
+
+- Add documentation for new Feature.
+- Add example usage in documentation.
+
+
 ## v0.2.0 (15/01/2025)
 
 ### Feature
