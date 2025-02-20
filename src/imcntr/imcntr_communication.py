@@ -12,15 +12,27 @@ class MessageExchange(SerialCommunication):
     """
     def __init__(self, *args, **kwargs):
         super(MessageExchange, self).__init__(*args)
+        self.send_observer = Observer()
         self.receive_observer = Observer()
         self.connection_lost_observer = Observer()
+
+    def send(self, data):
+        """
+        Called when to write data at serial port. It subsequently calls all the subscribed
+        observers.
+
+        :param e: Data to be written on serial port.
+        :type e: Exception
+        """
+        self.send_observer.call(data)
+        super(MessageExchange, self).send(data)
 
     def receive(self, data):
         """
         Called when new data is available at the serial port. It subsequently calls
         all the subscribed observers.
 
-        :param data: Data received on the serial port.
+        :param data: Data received on serial port.
         :type data: str
         """
         self.receive_observer.call(data)
