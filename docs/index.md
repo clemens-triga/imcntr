@@ -5,7 +5,7 @@
 :maxdepth: 1
 :hidden:
 
-example_primitive.ipynb
+example.md
 changelog.md
 contributing.md
 conduct.md
