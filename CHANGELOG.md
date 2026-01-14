@@ -12,7 +12,7 @@
    or monkey patching.
  - New wait and timeout handling in WaitForResponse.
  - Now Creating api by private factory class from Enum with WaitForResponse and SubmitTask class.
- - Added methods for action not callable instances.
+ - Added methods for action instead of callable instances.
 
 ### Test
  - Added tests to all package modules.
