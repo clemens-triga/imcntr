@@ -5,7 +5,6 @@
 :maxdepth: 1
 :hidden:
 
-example.md
 changelog.md
 contributing.md
 conduct.md

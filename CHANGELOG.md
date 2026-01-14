@@ -2,6 +2,21 @@
 
 <!--next-version-placeholder-->
 
+
+## v1.0.0 (14/01/2026)
+
+### New Version
+
+ - Renamed Modules and Classes for better readability.
+ - Added callback functions in protocol to be used as a hook. Either by overriding
+   or monkey patching.
+ - New wait and timeout handling in WaitForResponse.
+ - Now Creating api by private factory class from Enum with WaitForResponse and SubmitTask class.
+ - Added methods for action not callable instances.
+
+### Test
+ - Added tests to all package modules.
+
 ## v0.3.0 (20/02/2025)
 
 ### Feature

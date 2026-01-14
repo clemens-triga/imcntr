@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "imcntr"
-version = "0.3.0"
+version = "1.0.0"
 description = "A package providing an API for imaging controller based on an Arduino Nano Every to communicate via serial port."
 authors = ["Clemens Trunner"]
 license = "MIT"

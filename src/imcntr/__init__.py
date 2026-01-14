@@ -1,7 +1,10 @@
-from .imcntr_utils import Observer
-from .imcntr_connection import SerialCommunication
-from .imcntr_communication import MessageExchange, WaitForResponse, GiveOrder
-from .imcntr import Controller, Sample, Shutter, Ready, Connected, Out, In, Clockwise, CounterClockwise, Open, Close, StopMove, StopRotate, Stop
-from importlib.metadata import version
+from .response_observer import Observer
+from .device_connection import DeviceConnection
+from .device_command_handler import WaitForResponse, SubmitTask
+from .controller_api import Controller, Sample, Shutter
+from importlib.metadata import version, PackageNotFoundError
 
-__version__ = version("imcntr")
+try:
+    __version__ = version("imcntr")
+except PackageNotFoundError:
+    __version__ = None
