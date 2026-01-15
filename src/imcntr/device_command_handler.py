@@ -1,36 +1,38 @@
-from .device_connection import DeviceConnection
-import threading
-
 """
 Task and response helpers for a device connection.
 
 This module provides utility classes for sending tasks to a device
-and waiting for specific responses via given protocol using a threaded
-observer pattern.
+and waiting for specific responses via a given protocol using a
+threaded observer pattern.
 """
+
+from .device_connection import DeviceConnection
+import threading
 
 class WaitForResponse:
     """
-    Waits for a specific response from a connected device.
+    Wait for a specific response from a connected device.
 
-    An instance of this class subscribes to the protocol's receive observer and
-    blocks until the expected response is received or a timeout occurs.
+    An instance of this class subscribes to the protocol's receive observer
+    and blocks until the expected response is received or a timeout occurs.
 
-    The instance itself is callable and returns a boolean indicating whether the
-    response was received within the timeout period.
+    The instance itself is callable and returns a boolean indicating whether
+    the response was received within the timeout period.
+
+    This class is also used as the base class for :class:`SubmitTask`.
 
     Note:
-        Do not modify the `response` attribute while a wait is in progress. Doing
-        so may result in missed signals or inconsistent behavior.
+        Do not modify the :attr:`response` attribute while a wait is in progress.
+        Doing so may result in missed signals or inconsistent behavior.
 
-    :param protocol: Instance of SerialDeviceConnection` with an open connection.
-    :type protocol: SerialDeviceConnection
+    :param protocol: Active device communication protocol.
+    :type protocol: :class:`DeviceConnection`
     :param response: Expected response string to wait for.
     :type response: str
-    :param timeout: Default timeout in seconds. If None, waits indefinitely.
+    :param timeout: Default timeout in seconds. If ``None``, waits indefinitely.
     :type timeout: float | None
     """
-    def __init__(self, protocol, response = None, timeout = None):
+    def __init__(self, protocol, response=None, timeout=None):
         self._protocol, self._receive_observer = self._validate_protocol(protocol)
         if response is not None:
             self._response = self._validate_signal(response)
@@ -44,7 +46,11 @@ class WaitForResponse:
 
     @property
     def response(self):
-        """Get the expected response string."""
+        """
+        Expected response string.
+
+        :rtype: str
+        """
         return self._response
 
     @response.setter
@@ -55,29 +61,43 @@ class WaitForResponse:
         :param value: New expected response string.
         :type value: str
         :raises TypeError: If the value is not a string.
-        Note: Do not modify this while a wait is in progress.
+
+        .. warning::
+            Do not modify this attribute while a wait is in progress.
         """
         self._response = self._validate_signal(value)
 
     @property
     def timeout(self):
-        """Get the global timeout in seconds used when waiting for a response."""
+        """
+        Default timeout in seconds used when waiting for a response.
+
+        :rtype: float | None
+        """
         return self._timeout
 
     @timeout.setter
     def timeout(self, value):
-        """Set the global timeout (must be positive number)."""
+        """
+        Set the default timeout.
+
+        :param value: Timeout in seconds (must be positive).
+        :type value: float
+        :raises TypeError: If the value is not numeric.
+        :raises ValueError: If the value is not positive.
+        """
         self._timeout = self._validate_timeout(value)
 
     def _receive_message(self, data):
         """
-        Callback invoked when data is received from the protocol.
+        Receive observer callback.
 
-        If the received data matches the expected response, the internal event
-        is set, unblocking any thread that is currently waiting for this response.
+        This method is invoked by the protocol's receive observer whenever
+        data is received. If the received data matches the expected response,
+        the internal event is set, unblocking the waiting thread.
 
-        This is the core mechanism that allows WaitForResponse and SubmitTask
-        to block until the expected response is received.
+        This mechanism is shared by :class:`WaitForResponse` and
+        :class:`SubmitTask`.
 
         :param data: Data received from the device.
         :type data: str
@@ -90,8 +110,11 @@ class WaitForResponse:
         Validate that the protocol exposes the required interface.
 
         The protocol must provide:
-          - send(data: str)
-          - receive_observer with subscribe(callback) and unsubscribe(callback)
+            - :meth:`send`
+            - ``receive_observer`` with :meth:`subscribe` and :meth:`unsubscribe`
+
+        :param protocol: Protocol instance to validate.
+        :raises TypeError: If the protocol does not implement the required API.
         """
         if protocol is None:
             raise TypeError("Invalid protocol: must not be None")
@@ -116,14 +139,13 @@ class WaitForResponse:
 
     def _validate_signal(self, value):
         """
-        Validate a signal value. Signal is either a response or a task
+        Validate a signal value.
 
-        Ensures that the provided value is a string suitable for use as an
-        expected response or as a task to be sent to the device.
+        A signal can be either a response string or a task string.
 
-        :param value: Signal or task value to validate.
+        :param value: Signal value to validate.
         :type value: str
-        :return: The validated signal or task value.
+        :return: Validated signal.
         :rtype: str
         :raises TypeError: If the value is not a string.
         """
@@ -137,39 +159,33 @@ class WaitForResponse:
         """
         Validate and normalize a timeout value.
 
-        If `value` is None, the instance default timeout is used.
-        Ensures that the timeout is a positive numeric value.
-
-        :param value: Timeout value to validate.
-        :type value: float | None
-        :return: A validated timeout value.
-        :rtype: float | None
-        :raises TypeError: If the timeout is not a number.
-        :raises ValueError: If the timeout is not a positive number.
+        :param value: Timeout in seconds.
+        :type value: float
+        :return: Validated timeout.
+        :rtype: float
+        :raises TypeError: If the value is not numeric.
+        :raises ValueError: If the value is not positive.
         """
         if not isinstance(value, (int, float)):
             raise TypeError(
                 f"Invalid timeout: must be of type int or float, got '{type(value).__name__}'"
             )
         if value <= 0:
-            raise ValueError(f"Invalid timeout: must be non zero positive number, got '{value}'")
+            raise ValueError(
+                f"Invalid timeout: must be non-zero positive number, got '{value}'"
+            )
         return value
 
-    def __call__(self, timeout = None):
+    def __call__(self, timeout=None):
         """
         Block until the expected response is received or a timeout occurs.
 
-        If no timeout is provided, the instance default timeout is used.
+        If ``timeout`` is ``None``, the instance default timeout is used.
 
-        Note:
-            This call is blocking and thread-safe.
-            Do not change the `response` attribute during this call.
-
-        :param timeout: Time in seconds to wait for the response.
-                        If None, the instance timeout is used.
+        :param timeout: Maximum time to wait in seconds.
         :type timeout: float | None
-        :return: True if the response was received before the timeout,
-                 False if the timeout expired.
+        :return: ``True`` if the response was received before timeout,
+                 ``False`` otherwise.
         :rtype: bool
         :raises ValueError: If the expected response is not set.
         """
@@ -190,24 +206,20 @@ class WaitForResponse:
 
 class SubmitTask(WaitForResponse):
     """
-    Sends a task to the device and optionally waits for a response.
+    Send a task to the device and optionally wait for a response.
 
-    This class extends WaitForResponse by adding the ability to send a task
-    via the protocol. The instance is callable and can either send the task
-    without waiting or send the task and block until the expected response
-    is received or a timeout occurs.
+    This class extends :class:`WaitForResponse` by adding the ability to
+    transmit a task via the protocol before waiting for the response.
 
-    Note:
-        Do not modify the `response` attribute during the wait. Changing it
-        while waiting may result in missed or incorrect signals.
+    The instance itself is callable.
 
-    :param protocol: Instance of MessageExchange with an open connection.
-    :type protocol: MessageExchange
-    :param response: Expected response string to wait for.
+    :param protocol: Active device communication protocol.
+    :type protocol: :class:`DeviceConnection`
+    :param response: Expected response string.
     :type response: str
-    :param task: Default task string to send to the device.
+    :param task: Default task string to send.
     :type task: str
-    :param timeout: Default timeout in seconds. If None, waits indefinitely.
+    :param timeout: Default timeout in seconds. If ``None``, waits indefinitely.
     :type timeout: float | None
     """
     def __init__(self, protocol, response, task=None, timeout=None):
@@ -219,7 +231,11 @@ class SubmitTask(WaitForResponse):
 
     @property
     def task(self):
-        """Get the default task string to send to the device."""
+        """
+        Default task string sent to the device.
+
+        :rtype: str
+        """
         return self._task
 
     @task.setter
@@ -227,7 +243,7 @@ class SubmitTask(WaitForResponse):
         """
         Set a new default task string.
 
-        :param value: Task string to set.
+        :param value: Task string to send.
         :type value: str
         :raises TypeError: If the value is not a string.
         """
@@ -235,27 +251,16 @@ class SubmitTask(WaitForResponse):
 
     def __call__(self, timeout=None, wait=False):
         """
-        Send a task to the device and optionally wait for a response.
+        Send the task to the device and optionally wait for a response.
 
-        If wait is False, the task is sent and the method returns immediately.
-        If wait is True, the task is sent and the call blocks until the expected
-        response is received or the timeout expires.
-
-        Note:
-            Uses the instance default task and expected response. Do not modify
-            response during the call.
-
-
-        :param timeout: Time in seconds to wait for the response.
-                        If None, the instance timeout is used.
+        :param timeout: Maximum time to wait for the response in seconds.
         :type timeout: float | None
-        :param wait: Whether to wait for the response after sending the task.
+        :param wait: Whether to wait for the response after sending.
         :type wait: bool
-        :return: True if the response was received before the timeout when wait is True,
-                 False if the timeout expired. Returns None when wait is False.
+        :return: ``True`` if the response was received before timeout,
+                 ``False`` if timeout occurs, ``None`` if ``wait`` is False.
         :rtype: bool | None
         :raises ValueError: If the task is not set.
-        Note: Do not change the `response` attribute during this call.
         """
         task = self._task
         if task is None:

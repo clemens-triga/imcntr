@@ -1,102 +1,113 @@
+"""
+Observer utilities for event-driven notifications.
+
+This module provides a lightweight implementation of the Observer
+design pattern, allowing callables to subscribe to and be notified
+of events emitted by an observable source.
+"""
+
+
 class Observer:
     """
     Implements the Observer design pattern.
 
-    This class allows multiple callables (observers) to subscribe to an event source.
+    Allows multiple callables (observers) to subscribe to an event source.
     Each observer may be registered with predefined positional and keyword arguments.
     When the event is triggered via :meth:`call`, all subscribed observers are invoked.
 
-    Attributes:
-        observers (list): A list of subscribed observers. Each observer is stored as a
-        dictionary containing the target callable and its associated arguments.
+    See also:
+        :class:`DeviceConnection` for usage with serial receive events.
+        :class:`WaitForResponse` and :class:`SubmitTask` for task-response subscription patterns.
     """
+
     def __init__(self):
         """
-        Initializes the Observer object with an empty list to hold observers.
+        Initializes the Observer object with an empty list of observers.
 
-        This list will store dictionaries containing the target callable and its associated arguments
-        and keyword arguments.
+        Each observer is a dictionary with keys:
+            - ``target``: The callable to invoke.
+            - ``arguments``: Positional arguments for the callable.
+            - ``kwarguments``: Keyword arguments for the callable.
         """
         self._observers = []
 
     @property
     def observers(self):
         """
-        Returns the list of currently subscribed observers.
+        Return the list of currently subscribed observers.
 
-        :return: List of observer definitions.
+        :return: List of observer definitions (dicts with keys ``target``, ``arguments``, ``kwarguments``).
         :rtype: list
         """
         return self._observers
 
     def call(self, *args, **kwargs):
         """
-        Invokes all subscribed observers.
+        Invoke all subscribed observers.
 
-        Each observer is called with the arguments provided at subscription time,
-        followed by the arguments passed to this method.
+        Each observer is called with its predefined arguments (set at subscription via :meth:`subscribe`)
+        followed by the additional arguments provided here.
 
         :param args: Additional positional arguments passed to each observer.
         :param kwargs: Additional keyword arguments passed to each observer.
-        :raises TypeError: If a TypeError occurs while invoking an observer.
-        :raises RuntimeError: If any other exception is raised by an observer.
+        :raises TypeError: If an observer raises a TypeError (argument mismatch).
+        :raises RuntimeError: If any other exception occurs while calling an observer.
         """
         for observer in self._observers:
             try:
-                # Call the observer's target with its arguments and additional ones passed to call.
                 observer['target'](*observer['arguments'], *args, **observer['kwarguments'], **kwargs)
             except TypeError as e:
-                # Handle argument mismatch
-                raise TypeError("Wrong number of arguments when calling observer!") from e
+                raise TypeError(
+                    "Wrong number of arguments when calling observer!"
+                ) from e
             except Exception as e:
-                # Catch any other exceptions thrown by the observer function
-                raise RuntimeError("An exception occurred while calling observer!") from e
+                raise RuntimeError(
+                    "An exception occurred while calling observer!"
+                ) from e
 
     def subscribe(self, target, *args, **kwargs):
         """
-        Subscribes a new observer to the subject. The observer is added to the list with any optional arguments
-        or keyword arguments provided.
+        Subscribe a new observer.
 
-        :param target: The target function or callable to be notified.
+        The observer will be invoked when :meth:`call` is executed.
+
+        :param target: The callable to be notified.
         :type target: callable
-        :param args: Variable-length argument list that will be passed to the target when called.
-        :param kwargs: Arbitrary keyword arguments to be passed to the target when called.
+        :param args: Optional positional arguments for the callable.
+        :param kwargs: Optional keyword arguments for the callable.
+
         """
         observer_to_subscribe = {'target': target, 'arguments': args, 'kwarguments': kwargs}
-
-        # Ensure that the observer is not already in the list before adding.
         if observer_to_subscribe not in self._observers:
             self._observers.append(observer_to_subscribe)
 
-    def unsubscribe(self, target=None, *args, remove_all=False, **kwargs):
+    def unsubscribe(self, target: callable = None, *args, remove_all = False, **kwargs):
         """
-        Unsubscribes observers from the observer list.
+        Unsubscribe observers.
 
         Behavior depends on the provided arguments:
-        - If no target is provided, all observers are removed.
-        - If a target is provided and ``remove_all`` is False, only the observer matching
-          the target *and* the given arguments is removed.
-        - If a target is provided and ``remove_all`` is True, all observers with the given
-          target are removed, regardless of their arguments.
+
+        - If no ``target`` is provided, all observers are removed.
+        - If ``target`` is provided and ``remove_all`` is False, only the observer
+          matching the target **and** provided arguments is removed.
+        - If ``target`` is provided and ``remove_all`` is True, all observers
+          with the matching target are removed, regardless of their arguments.
 
         :param target: The observer callable to remove.
         :type target: callable, optional
-        :param remove_all: If True, remove all observers matching the target.
+        :param remove_all: Remove all observers matching the target if True.
         :type remove_all: bool
         :param args: Positional arguments used to match a specific subscription.
         :param kwargs: Keyword arguments used to match a specific subscription.
         """
         if target:
-            # If specific target is provided and 'remove_all' is False, remove the observer with matching target and arguments.
             if not remove_all:
                 observer_to_unsubscribe = {'target': target, 'arguments': args, 'kwarguments': kwargs}
                 if observer_to_unsubscribe in self._observers:
                     self._observers.remove(observer_to_unsubscribe)
             else:
-                # If 'remove_all' is True, remove all observers with the matching target.
                 for observer in self._observers[:]:
                     if observer['target'] == target:
                         self._observers.remove(observer)
         else:
-            # If no target is provided, remove all observers.
             self._observers.clear()

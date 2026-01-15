@@ -1,26 +1,33 @@
+"""
+Controller task definitions and high-level device interfaces.
+
+This module defines controller command/response pairs and provides
+high-level interfaces for interacting with the device controller,
+sample positioning system, and shutter.
+
+The module builds communication protocol :class:`DeviceConnection` as well as on as
+low-level command handlers provided by:class:`SubmitTask` and
+:class:`WaitForResponse`, exposing a clear, structured, and type-safe API for
+device operation.
+"""
+
 from .device_command_handler import WaitForResponse, SubmitTask
 from enum import Enum
 from dataclasses import dataclass
 from typing import Optional
 
-"""
-Imaging Controller Task Interface Module.
-
-This module provides high-level classes and helpers for interacting with an
-Imaging controller via a communication protocol. It defines controller tasks,
-creates task submission and response-waiting objects, and exposes simple
-interfaces for common operations such as moving samples, rotating, stopping
-motions, and controlling the shutter.
-"""
-
 @dataclass(frozen=True)
 class TaskDef:
     """
-    Definition of a task and its expected response.
+    Definition of a controller task and its expected response.
 
-    :param task: The task string to send to the controller. None if the task cannot be submitted.
+    A :class:`TaskDef` couples a command string with the response string that
+    the controller is expected to emit after executing the command.
+
+    :param task: Command string sent to the controller,
+                 or ``None`` if the task cannot be submitted.
     :type task: Optional[str]
-    :param response: The expected response string from the controller.
+    :param response: Expected response string from the controller.
     :type response: str
     """
     task: Optional[str]
@@ -29,11 +36,12 @@ class TaskDef:
 
 class _Task(Enum):
     """
-    Enumeration of controller tasks with their associated definitions.
+    Enumeration of controller tasks backed by :class:`TaskDef`.
 
-    Each task contains:
-        - `task`: The string to send (if applicable).
-        - `response`: The expected response string from the controller.
+    Each enum member's *value* is a :class:`TaskDef` instance that defines:
+
+    - ``task``: The command string sent to the controller (or ``None``).
+    - ``response``: The expected response string from the controller.
     """
     READY = TaskDef(None, "controller_ready")
     CONNECTED = TaskDef("connect", "connected")
@@ -50,249 +58,227 @@ class _Task(Enum):
 
 class _TaskFactory:
     """
-    Factory to create SubmitTask or WaitForResponse instances for controller tasks.
+    Factory for creating :class:`SubmitTask` and :class:`WaitForResponse`
+    instances from :class:`_Task` definitions.
+
+    :param protocol: Communication protocol instance.
+    :type protocol: imcntr.device_connection.DeviceConnection
     """
 
     def __init__(self, protocol):
-        """
-        Initialize the TaskFactory with a protocol instance.
-
-        :param protocol: Communication protocol instance.
-        :type protocol: MessageExchange
-        """
         self._protocol = protocol
 
-    def submit(self, task):
+    def submit(self, task: _Task) -> SubmitTask:
         """
-        Create a SubmitTask instance for a task that can be submitted.
+        Create a :class:`SubmitTask` for a submit-capable controller task.
 
-        :param task: The task enum to submit.
+        :param task: Task enum describing the command and expected response.
         :type task: _Task
-        :return: SubmitTask instance.
+        :return: Configured submit task instance.
         :rtype: SubmitTask
         """
         return SubmitTask(
             protocol=self._protocol,
             task=task.value.task,
-            response=task.value.response
+            response=task.value.response,
         )
 
-    def wait(self, task):
+    def wait(self, task: _Task) -> WaitForResponse:
         """
-        Create a WaitForResponse instance for a task's expected response.
+        Create a :class:`WaitForResponse` for a task's expected response.
 
-        :param task: The task enum to wait for.
+        :param task: Task enum describing the expected response.
         :type task: _Task
-        :return: WaitForResponse instance.
+        :return: Configured wait task instance.
         :rtype: WaitForResponse
         """
         return WaitForResponse(
             protocol=self._protocol,
-            response=task.value.response
+            response=task.value.response,
         )
 
 
 class Controller:
     """
-    Provides methods to interact with the controller, such as checking readiness and connection.
+    Controller interface.
+
+    Provides methods to wait for controller readiness and to check connection
+    status.
+
+    :param protocol: Communication protocol instance.
+    :type protocol: imcntr.DeviceConnection
     """
 
     def __init__(self, protocol):
-        """
-        Provides functionality to wait for controller to be ready and check connection.
+        factory = _TaskFactory(protocol)
+        self._ready = factory.wait(_Task.READY)
+        self._connected = factory.submit(_Task.CONNECTED)
 
-        :param protocol: Communication protocol instance.
-        :type protocol: MessageExchange
+    def connected(self, timeout: float) -> Optional[bool]:
         """
-        _factory = _TaskFactory(protocol)
-        self._ready = _factory.wait(_Task.READY)
-        self._connected = _factory.submit(_Task.CONNECTED)
+        Check whether the controller is connected.
 
-    def connected(self, *args, **kwargs):
-        """
-        Submit the connect task to the controller.
-
-        :param args: Positional arguments forwarded to SubmitTask.
-        :param kwargs: Keyword arguments forwarded to SubmitTask.
-        :return: True if waiting for response and it is received, None if wait=False.
+        :param timeout: Maximum time to wait for the expected response, in seconds.
+        :type timeout: float
+        :return: ``True`` if the response is received within the timeout,
+                 ``False`` if the timeout expires.
         :rtype: Optional[bool]
         """
-        return self._connected(*args, **kwargs)
+        return self._connected(timeout)
 
-    def ready(self, *args, **kwargs):
+    def ready(self, timeout: float) -> bool:
         """
-        Wait for the controller to be ready.
+        Wait for the controller to report it is ready.
 
-        :param args: Positional arguments forwarded to WaitForResponse.
-        :param kwargs: Keyword arguments forwarded to WaitForResponse.
-        :return: True if the controller reports ready within the timeout, False otherwise.
+        :param timeout: Maximum time to wait for the ready response, in seconds.
+        :type timeout: float
+        :return: ``True`` if the controller becomes ready within the timeout,
+                 ``False`` otherwise.
         :rtype: bool
         """
-        return self._ready(*args, **kwargs)
+        return self._ready(timeout)
+
 
 class Sample:
     """
-    Provides functionality to move sample in/out, rotate, and stop movements.
+    Interface for sample movement and rotation control.
+
+    Provides methods to move sample in/out, rotate, and stop movements.
+
+    :param protocol: Communication protocol instance.
+    :type protocol: imcntr.DeviceConnection
     """
-
     def __init__(self, protocol):
+        factory = _TaskFactory(protocol)
+        self._move_in = factory.submit(_Task.MOVE_IN)
+        self._move_out = factory.submit(_Task.MOVE_OUT)
+        self._move_stop = factory.submit(_Task.MOVE_STOP)
+        self._rotate_cw = factory.submit(_Task.ROTATE_CW)
+        self._rotate_ccw = factory.submit(_Task.ROTATE_CCW)
+        self._rotate_stop = factory.submit(_Task.ROTATE_STOP)
+        self._stop = factory.submit(_Task.STOP)
+
+    def _validate_step(self, value: int) -> int:
         """
-        Initialize sample movement and rotation tasks.
+        Validate a rotation step value.
 
-        :param protocol: Communication protocol instance.
-        :type protocol: MessageExchange
-        """
-        _factory = _TaskFactory(protocol)
-        self._move_in = _factory.submit(_Task.MOVE_IN)
-        self._move_out = _factory.submit(_Task.MOVE_OUT)
-        self._move_stop = _factory.submit(_Task.MOVE_STOP)
-        self._rotate_cw = _factory.submit(_Task.ROTATE_CW)
-        self._rotate_ccw = _factory.submit(_Task.ROTATE_CCW)
-        self._rotate_stop = _factory.submit(_Task.ROTATE_STOP)
-        self._stop = _factory.submit(_Task.STOP)
-
-    def _validate_step(self, value):
-        """
-        Validate that a rotation step is a positive integer.
-
-        Ensures that rotation commands are always sent with a valid positive
-        step count to prevent controller errors. Steps must be positive number.
-
-        :param value: Rotation step value.
+        :param value: Rotation step count.
         :type value: int
-        :return: The validated step.
+        :return: Validated step count.
         :rtype: int
-        :raises TypeError: If the value is not an int.
-        :raises ValueError: If the value is not a positive integer.
+        :raises TypeError: If the value is not an integer.
+        :raises ValueError: If the value is not positive.
         """
         if not isinstance(value, int):
-            raise TypeError(f"Invalid step: must be of type int, got '{type(value).__name__}'")
+            raise TypeError(
+                f"Invalid step: must be of type int, got '{type(value).__name__}'"
+            )
         if value <= 0:
-            raise ValueError(f"Invalid step: must be non-zero positive number, got '{value}'")
+            raise ValueError(
+                f"Invalid step: must be non-zero positive number, got '{value}'"
+            )
         return value
 
-    def move_in(self, *args, **kwargs):
+    def move_in(self, timeout: float):
         """
         Move the sample in.
 
-        :param args: Positional arguments forwarded to SubmitTask.
-        :param kwargs: Keyword arguments forwarded to SubmitTask.
-        :return: Result from SubmitTask.
+        :param timeout: Maximum time to wait for completion, in seconds.
+        :type timeout: float
         """
-        return self._move_in(*args, **kwargs)
+        return self._move_in(timeout)
 
-    def move_out(self, *args, **kwargs):
+    def move_out(self, timeout: float):
         """
         Move the sample out.
 
-        :param args: Positional arguments forwarded to SubmitTask.
-        :param kwargs: Keyword arguments forwarded to SubmitTask.
-        :return: Result from SubmitTask.
+        :param timeout: Maximum time to wait for completion, in seconds.
+        :type timeout: float
         """
-        return self._move_out(*args, **kwargs)
+        return self._move_out(timeout)
 
-    def move_stop(self, *args, **kwargs):
+    def move_stop(self, timeout: float):
         """
-        Stop linear movement of the sample.
+        Stop linear sample movement.
 
-        :param args: Positional arguments forwarded to SubmitTask.
-        :param kwargs: Keyword arguments forwarded to SubmitTask.
-        :return: Result from SubmitTask.
+        :param timeout: Maximum time to wait for completion, in seconds.
+        :type timeout: float
         """
-        return self._move_stop(*args, **kwargs)
+        return self._move_stop(timeout)
 
-    def rotate_cw(self, step: int, *args, **kwargs):
+    def rotate_cw(self, step: int, timeout: float):
         """
-        Rotate the sample clockwise by a given number of steps.
+        Rotate the sample clockwise.
 
-        Note:
-            This method modifies the task string dynamically to include the
-            step count.
-
-        :param step: Number of steps to rotate.
+        :param step: Number of rotation steps.
         :type step: int
-        :param args: Positional arguments forwarded to SubmitTask.
-        :param kwargs: Keyword arguments forwarded to SubmitTask.
-        :return: Result from SubmitTask.
+        :param timeout: Maximum time to wait for completion, in seconds.
+        :type timeout: float
         """
         step = self._validate_step(step)
         self._rotate_cw.task = f"{_Task.ROTATE_CW.value.task}+{step}"
-        return self._rotate_cw(*args, **kwargs)
+        return self._rotate_cw(timeout)
 
-    def rotate_ccw(self, step: int, *args, **kwargs):
+    def rotate_ccw(self, step: int, timeout: float):
         """
-        Rotate the sample counterclockwise by a given number of steps.
+        Rotate the sample counterclockwise.
 
-        Note:
-            This method modifies the task string dynamically to include the
-            step count.
-
-        :param step: Number of steps to rotate.
+        :param step: Number of rotation steps.
         :type step: int
-        :param args: Positional arguments forwarded to SubmitTask.
-        :param kwargs: Keyword arguments forwarded to SubmitTask.
-        :return: Result from SubmitTask.
+        :param timeout: Maximum time to wait for completion, in seconds.
+        :type timeout: float
         """
         step = self._validate_step(step)
         self._rotate_ccw.task = f"{_Task.ROTATE_CCW.value.task}+{step}"
-        return self._rotate_ccw(*args, **kwargs)
+        return self._rotate_ccw(timeout)
 
-    def rotate_stop(self, *args, **kwargs):
+    def rotate_stop(self, timeout: float):
         """
-        Stop rotation of the sample.
+        Stop sample rotation.
 
-        :param args: Positional arguments forwarded to SubmitTask.
-        :param kwargs: Keyword arguments forwarded to SubmitTask.
-        :return: Result from SubmitTask.
+        :param timeout: Maximum time to wait for completion, in seconds.
+        :type timeout: float
         """
-        return self._rotate_stop(*args, **kwargs)
+        return self._rotate_stop(timeout)
 
-    def stop(self, *args, **kwargs):
+    def stop(self, timeout: float):
         """
-        Stop all movements of the sample.
+        Stop all sample movements.
 
-        :param args: Positional arguments forwarded to SubmitTask.
-        :param kwargs: Keyword arguments forwarded to SubmitTask.
-        :return: Result from SubmitTask.
+        :param timeout: Maximum time to wait for completion, in seconds.
+        :type timeout: float
         """
-        return self._stop(*args, **kwargs)
+        return self._stop(timeout)
 
 
 class Shutter:
     """
+    Interface for shutter control.
+
     Provides methods to open or close the shutter.
+
+    :param protocol: Communication protocol instance.
+    :type protocol: imcntr.DeviceConnection
     """
-
     def __init__(self, protocol):
-        """
-        Initialize shutter control tasks.
+        factory = _TaskFactory(protocol)
+        self._open = factory.submit(_Task.OPEN)
+        self._close = factory.submit(_Task.CLOSE)
 
-        :param protocol: Communication protocol instance.
-        :type protocol: MessageExchange
-        """
-        _factory = _TaskFactory(protocol)
-        self._open = _factory.submit(_Task.OPEN)
-        self._close = _factory.submit(_Task.CLOSE)
-
-    def close(self, *args, **kwargs):
+    def close(self, timeout: float):
         """
         Close the shutter.
 
-        :param args: Positional arguments forwarded to SubmitTask.
-        :param kwargs: Keyword arguments forwarded to SubmitTask.
-        :return: Result from SubmitTask.
+        :param timeout: Maximum time to wait for completion, in seconds.
+        :type timeout: float
         """
-        return self._close(*args, **kwargs)
+        return self._close(timeout)
 
-    def open(self, *args, **kwargs):
+    def open(self, timeout: float):
         """
         Open the shutter.
 
-        :param args: Positional arguments forwarded to SubmitTask.
-        :param kwargs: Keyword arguments forwarded to SubmitTask.
-        :return: Result from SubmitTask.
+        :param timeout: Maximum time to wait for completion, in seconds.
+        :type timeout: float
         """
-        return self._open(*args, **kwargs)
-
-if __name__ == '__main__':
-    exit(0)
+        return self._open(timeout)

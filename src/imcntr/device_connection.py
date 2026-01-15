@@ -1,26 +1,34 @@
-import serial
-import serial.threaded
-from .response_observer import Observer
-
 """
-Serial communication utilities based on pySerial.
+Serial communication utilities based on :mod:`serial` (pySerial).
 
 This module provides a high-level interface for line-based serial communication,
 including threaded reading, observer-based receive handling, and extensible
 callback hooks.
+
+See also:
+    :class:`serial.Serial`
+    :class:`serial.threaded.ReaderThread`
 """
+
+import serial
+import serial.threaded
+from .response_observer import Observer
 
 class _SerialLineHandler(serial.threaded.LineReader):
     """
-    A LineReader protocol for handling serial communication.
+    Line-based protocol handler for serial communication.
 
-    Lines received from the serial port are forwarded to the assigned receiver via its
-    `receive` method. Connection loss is reported to the receiver via `connection_lost`.
+    This class subclasses :class:`serial.threaded.LineReader` and forwards
+    received lines and connection-loss events to a receiver object.
+
+    The receiver must implement:
+        - :meth:`receive`
+        - :meth:`connection_lost`
     """
 
     def __init__(self):
         """
-        Initializes the _SerialLineHandler instance with no receiver.
+        Initialize the protocol handler with no receiver.
         """
         super().__init__()
         self._receiver = None
@@ -28,18 +36,24 @@ class _SerialLineHandler(serial.threaded.LineReader):
     @property
     def receiver(self):
         """
-        Gets the current receiver of the protocol.
+        Receiver for incoming data and connection events.
 
-        :return: The receiver instance that handles incoming data.
+        :return: Receiver instance.
+        :rtype: object
         """
         return self._receiver
 
     @receiver.setter
     def receiver(self, value):
         """
-        Sets the receiver instance for handling incoming data.
+        Set the receiver for handling incoming data.
 
-        :param value: An object with `receive(data)` and `connection_lost(exception)` methods.
+        The receiver must implement:
+            - ``receive(data: str)``
+            - ``connection_lost(exception: Exception)``
+
+        :param value: Receiver instance.
+        :type value: object
         """
         self._receiver = value
 
@@ -47,9 +61,9 @@ class _SerialLineHandler(serial.threaded.LineReader):
         """
         Called automatically when the serial connection is lost.
 
-        Forwards the exception to the receiver's `connection_lost` method.
+        Forwards the event to :meth:`receiver.connection_lost`.
 
-        :param exc: The exception that caused the connection loss.
+        :param exc: Exception that caused the connection loss.
         :type exc: Exception
         """
         if self._receiver is not None:
@@ -57,32 +71,34 @@ class _SerialLineHandler(serial.threaded.LineReader):
 
     def handle_line(self, line):
         """
-        Called automatically when a new line is received from the serial port.
+        Called automatically when a complete line is received.
 
-        Forwards the received line to the receiver's `receive` method.
+        Forwards the received line to :meth:`receiver.receive`.
 
-        :param line: A line of data received from the serial port.
+        :param line: Line of data received from the serial port.
         :type line: str
         """
         if self._receiver is not None:
             self._receiver.receive(line)
 
 
-
 class DeviceConnection:
     """
-    Manages serial connection with a device over a serial port using thread.
+    Manages a serial device connection using pySerial and a reader thread.
 
-    Provides methods to connect, disconnect, send, and receive data.
-    Supports context manager usage to automatically handle connections.
+    This class encapsulates:
+        - Serial port management (:class:`serial.Serial`)
+        - Threaded I/O (:class:`serial.threaded.ReaderThread`)
+
+    It also supports usage as a context manager.
     """
 
     def __init__(self, port=None):
         """
-        Initializes the SerialCommunication instance with an optional serial port.
+        Initialize the device connection.
 
-        :param port: The serial port to connect to (optional).
-        :type port: str, optional
+        :param port: Serial port identifier (e.g. ``'COM3'`` or ``'/dev/ttyUSB0'``).
+        :type port: str | None
         """
         self._port = None
         if port is not None:
@@ -96,9 +112,10 @@ class DeviceConnection:
     @property
     def connected(self):
         """
-        Checks if the serial connection and reader thread are active.
+        Whether the device is currently connected.
 
-        :return: True if connected and reader thread is alive, False otherwise.
+        :return: ``True`` if the serial connection is open and the reader thread
+                 is running.
         :rtype: bool
         """
         return bool(
@@ -111,31 +128,31 @@ class DeviceConnection:
     @property
     def connection(self):
         """
-        Returns the current serial connection object.
+        Active serial connection.
 
-        :return: The serial connection instance or None if not connected.
-        :rtype: serial.Serial or None
+        :return: Serial connection instance or ``None``.
+        :rtype: serial.Serial | None
         """
         return self._serial_connection
 
     @property
     def port(self):
         """
-        Returns the currently configured serial port.
+        Configured serial port.
 
-        :return: The serial port as a string.
-        :rtype: str or None
+        :return: Serial port identifier.
+        :rtype: str | None
         """
         return self._port
 
     @port.setter
     def port(self, value):
         """
-        Sets the serial port for the connection.
+        Set the serial port.
 
-        :param value: The serial port to use (e.g., 'COM3' or '/dev/ttyUSB0').
+        :param value: Serial port identifier.
         :type value: str
-        :raises TypeError: If the value is not a string.
+        :raises TypeError: If ``value`` is not a string.
         """
         if not isinstance(value, str):
             raise TypeError("port must be a string")
@@ -144,11 +161,11 @@ class DeviceConnection:
     @property
     def receive_observer(self):
         """
-        Returns the Observer used to notify subscribers when data is received.
+        Observer notified when data is received.
 
-        Subscribers will be called with the received data string.
+        Subscribers are called with the received data string.
 
-        :return: Observer instance for received data.
+        :return: Receive observer instance.
         :rtype: Observer
         """
         return self._receive_observer
@@ -156,19 +173,19 @@ class DeviceConnection:
     @property
     def thread(self):
         """
-        Returns the ReaderThread instance managing the serial connection.
+        Reader thread managing serial I/O.
 
-        :return: The ReaderThread instance or None if not started.
-        :rtype: serial.threaded.ReaderThread or None
+        :return: Reader thread instance or ``None``.
+        :rtype: serial.threaded.ReaderThread | None
         """
         return self._thread
 
     def connect(self):
         """
-        Establishes the serial connection and starts the read/write thread.
+        Establish the serial connection and start the reader thread.
 
-        :raises ValueError: If the serial port is not specified.
-        :raises RuntimeError: If the connection is already established or fails.
+        :raises ValueError: If the serial port is not set.
+        :raises RuntimeError: If already connected or connection fails.
         """
         if not self._port:
             raise ValueError("Serial port must be specified before connecting")
@@ -179,12 +196,12 @@ class DeviceConnection:
 
     def connection_lost(self, exception):
         """
-        Called when the connection is closed or lost.
+        Handle connection loss.
 
-        This method resets the internal connection state and then invokes
-        `connection_lost_callback`.
+        Resets internal state and forwards the event to
+        :meth:`connection_lost_callback`.
 
-        :param exception: The exception that caused the connection loss.
+        :param exception: Exception that caused the connection loss.
         :type exception: Exception
         """
         self._reset_connection()
@@ -192,20 +209,20 @@ class DeviceConnection:
 
     def connection_lost_callback(self, exception):
         """
-        Optional hook called when the connection is closed or lost.
+        Optional hook invoked when the connection is lost.
 
-        Override in a subclass to handle connection loss.
+        Override in subclasses or monekey patch to implement custom handling.
 
-        :param exception: The exception that caused the connection loss.
+        :param exception: Exception that caused the connection loss.
         :type exception: Exception
         """
         pass
 
     def disconnect(self):
         """
-        Stops the reader thread and closes the serial connection.
+        Close the serial connection and stop the reader thread.
 
-        :raises RuntimeError: If the connection cannot be closed properly.
+        :raises RuntimeError: If the connection cannot be closed cleanly.
         """
         try:
             if self._thread and self._thread.is_alive():
@@ -219,11 +236,12 @@ class DeviceConnection:
 
     def receive(self, data):
         """
-        Called when data is received from the serial port.
+        Handle received data from the serial device.
 
-        Calls all subscribed observers and triggers `receive_callback`.
+        Notifies all subscribers via :attr:`receive_observer` and then calls
+        :meth:`receive_callback`.
 
-        :param data: Data received from the serial port.
+        :param data: Received data.
         :type data: str
         """
         self._receive_observer.call(data)
@@ -231,27 +249,25 @@ class DeviceConnection:
 
     def receive_callback(self, data):
         """
-        Optional hook called when new data is received.
+        Optional hook invoked when data is received.
 
-        Override in a subclass to handle incoming data.
+        Override in subclasses or monekey patch to implement custom handling.
 
-        Note:
-            Callbacks and observers are executed in the serial reader thread,
-            not in the main thread.
+        .. note::
+            This callback is executed in the serial reader thread.
 
-
-        :param data: The received data.
+        :param data: Received data.
         :type data: str
         """
         pass
 
     def send(self, data):
         """
-        Sends a string message over the serial connection.
+        Send data to the device.
 
-        :param data: The message to send.
+        :param data: Data string to send.
         :type data: str
-        :raises RuntimeError: If the connection is not active or sending fails.
+        :raises RuntimeError: If not connected or sending fails.
         """
         if not self.connected:
             raise RuntimeError("Not connected to serial port")
@@ -263,21 +279,20 @@ class DeviceConnection:
 
     def send_callback(self, data):
         """
-        Optional hook called after data has been successfully sent.
+        Optional hook invoked after data is sent.
 
-        Override in a subclass to perform actions after sending data.
+        Override in subclasses or monekey patch to implement custom handling.
 
-        :param data: The sent data.
+        :param data: Sent data.
         :type data: str
         """
         pass
 
     def _connect_to_serial_port(self):
         """
-        Opens the serial connection using the configured port.
+        Open the serial port.
 
-        :raises RuntimeError: If the connection fails due to invalid parameters,
-                              unavailable port, or other exceptions.
+        :raises RuntimeError: If the port cannot be opened.
         """
         try:
             self._serial_connection = serial.Serial(self._port)
@@ -290,13 +305,9 @@ class DeviceConnection:
 
     def _reset_connection(self):
         """
-        Resets all internal connection-related state.
+        Reset all internal connection state.
 
-        This method clears the serial connection, reader thread, transport,
-        and protocol references. It is called after a clean disconnect or
-        when the connection is lost.
-
-        This is an internal method and should not be called directly.
+        Internal use only.
         """
         self._serial_connection = None
         self._thread = None
@@ -305,13 +316,16 @@ class DeviceConnection:
 
     def _start_serial_reader_thread(self):
         """
-        Starts a threaded reader/writer for the serial connection.
+        Start the reader thread for serial communication.
 
-        Initializes the protocol, sets the receiver, and starts the ReaderThread.
+        Initializes the protocol handler and assigns the receiver.
 
-        :raises RuntimeError: If the thread fails to start.
+        :raises RuntimeError: If the reader thread fails to start.
         """
-        self._thread = serial.threaded.ReaderThread(self._serial_connection, _SerialLineHandler)
+        self._thread = serial.threaded.ReaderThread(
+            self._serial_connection,
+            _SerialLineHandler,
+        )
         self._transport, self._protocol = self._thread.connect()
         self._protocol.receiver = self
         try:
@@ -321,10 +335,10 @@ class DeviceConnection:
 
     def __enter__(self):
         """
-        Enter a context manager, establishing the serial connection.
+        Enter context manager and connect.
 
-        :raises RuntimeError: If the connection cannot be opened.
-        :return: The SerialCommunication instance.
+        :return: This instance.
+        :rtype: DeviceConnection
         """
         self.connect()
         if not self.connected:
@@ -333,15 +347,12 @@ class DeviceConnection:
 
     def __exit__(self, exc_type, exc_value, traceback):
         """
-        Exit a context manager and disconnect the serial connection.
+        Exit context manager and disconnect.
 
-        Exceptions during disconnection are suppressed. Exceptions in the `with` block
-        are propagated.
+        Exceptions raised inside the ``with`` block are propagated.
 
-        :param exc_type: Exception type if raised, else None.
-        :param exc_value: Exception value if raised, else None.
-        :param traceback: Traceback object if an exception occurred, else None.
-        :return: False to propagate exceptions from the `with` block.
+        :return: ``False`` to propagate exceptions.
+        :rtype: bool
         """
         try:
             self.disconnect()
