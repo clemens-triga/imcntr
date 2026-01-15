@@ -19,7 +19,7 @@ from typing import Optional
 @dataclass(frozen=True)
 class TaskDef:
     """
-    Represent a task and response pair in form of a ``dataclass`.
+    Represent a task and response pair in form of a `dataclass`.
 
     :param task: Command string sent to the controller,
                  or ``None`` if the task cannot be submitted.
