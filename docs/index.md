@@ -6,6 +6,7 @@
 :hidden:
 
 changelog.md
+examples.md
 contributing.md
 conduct.md
 autoapi/index
