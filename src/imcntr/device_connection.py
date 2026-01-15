@@ -326,12 +326,12 @@ class DeviceConnection:
             self._serial_connection,
             _SerialLineHandler,
         )
-        self._transport, self._protocol = self._thread.connect()
-        self._protocol.receiver = self
         try:
             self._thread.start()
         except Exception as e:
             raise RuntimeError("Connecting communication thread failed!") from e
+        self._transport, self._protocol = self._thread.connect()
+        self._protocol.receiver = self
 
     def __enter__(self):
         """

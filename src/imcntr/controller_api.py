@@ -19,10 +19,7 @@ from typing import Optional
 @dataclass(frozen=True)
 class TaskDef:
     """
-    Definition of a controller task and its expected response.
-
-    A :class:`TaskDef` couples a command string with the response string that
-    the controller is expected to emit after executing the command.
+    Represent a task and response pair in form of a ``dataclass`.
 
     :param task: Command string sent to the controller,
                  or ``None`` if the task cannot be submitted.
@@ -56,7 +53,7 @@ class _Task(Enum):
     STOP = TaskDef("stop_all", "all_stopped")
 
 
-class _TaskFactory:
+class TaskFactory:
     """
     Factory for creating :class:`SubmitTask` and :class:`WaitForResponse`
     instances from :class:`_Task` definitions.
@@ -68,7 +65,7 @@ class _TaskFactory:
     def __init__(self, protocol):
         self._protocol = protocol
 
-    def submit(self, task: _Task) -> SubmitTask:
+    def submit(self, task):
         """
         Create a :class:`SubmitTask` for a submit-capable controller task.
 
@@ -83,7 +80,7 @@ class _TaskFactory:
             response=task.value.response,
         )
 
-    def wait(self, task: _Task) -> WaitForResponse:
+    def wait(self, task):
         """
         Create a :class:`WaitForResponse` for a task's expected response.
 
@@ -114,7 +111,7 @@ class Controller:
         self._ready = factory.wait(_Task.READY)
         self._connected = factory.submit(_Task.CONNECTED)
 
-    def connected(self, timeout: float) -> Optional[bool]:
+    def connected(self, timeout):
         """
         Check whether the controller is connected.
 
@@ -126,7 +123,7 @@ class Controller:
         """
         return self._connected(timeout)
 
-    def ready(self, timeout: float) -> bool:
+    def ready(self, timeout):
         """
         Wait for the controller to report it is ready.
 
@@ -179,7 +176,7 @@ class Sample:
             )
         return value
 
-    def move_in(self, timeout: float):
+    def move_in(self, timeout):
         """
         Move the sample in.
 
@@ -188,7 +185,7 @@ class Sample:
         """
         return self._move_in(timeout)
 
-    def move_out(self, timeout: float):
+    def move_out(self, timeout):
         """
         Move the sample out.
 
@@ -197,7 +194,7 @@ class Sample:
         """
         return self._move_out(timeout)
 
-    def move_stop(self, timeout: float):
+    def move_stop(self, timeout):
         """
         Stop linear sample movement.
 
@@ -206,7 +203,7 @@ class Sample:
         """
         return self._move_stop(timeout)
 
-    def rotate_cw(self, step: int, timeout: float):
+    def rotate_cw(self, step: int, timeout):
         """
         Rotate the sample clockwise.
 
@@ -219,7 +216,7 @@ class Sample:
         self._rotate_cw.task = f"{_Task.ROTATE_CW.value.task}+{step}"
         return self._rotate_cw(timeout)
 
-    def rotate_ccw(self, step: int, timeout: float):
+    def rotate_ccw(self, step: int, timeout):
         """
         Rotate the sample counterclockwise.
 
@@ -232,7 +229,7 @@ class Sample:
         self._rotate_ccw.task = f"{_Task.ROTATE_CCW.value.task}+{step}"
         return self._rotate_ccw(timeout)
 
-    def rotate_stop(self, timeout: float):
+    def rotate_stop(self, timeout):
         """
         Stop sample rotation.
 
