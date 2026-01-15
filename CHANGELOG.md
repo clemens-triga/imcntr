@@ -3,6 +3,21 @@
 <!--next-version-placeholder-->
 
 
+## v1.1.0 (15/01/2026)
+
+### Feature
+
+ - Changed 'TaskFactory' class to public.
+
+### Fix
+
+ - Fixed a deadlock in serial thread during connection by changing the order
+   of calls: first 'thread.start()', then 'thread.connect()'.
+
+### Documentation
+
+ - Removed some inconsistent type documentation.
+
 ## v1.0.0 (14/01/2026)
 
 ### New Version
